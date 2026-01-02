@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ludo Game</title>
+    <style>
+        :root {
+            --red: #d92d20;
+            --red-light: #f75e51;
+            --red-dark: #a61b0f;
+
+            --green: #2b9348;
+            --green-light: #48c76d;
+            --green-dark: #1e6d34;
+
+            --blue: #226fbf;
+            --blue-light: #4ba2f2;
+            --blue-dark: #1a5691;
+
+            --yellow: #f9c74f;
+            --yellow-light: #fce08d;
+            --yellow-dark: #d4a22a;
+            
+            --white: #ffffff;
+            --black: #000000;
+            --board-bg: #f1faee;
+            --border-color: #333;
+            --cell-size: clamp(25px, 4.5vw, 38px); /* Responsive cell size */
+            --token-size: calc(var(--cell-size) * 0.75);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--board-bg);
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .board-wrapper {
+            position: relative;
+            margin: 60px; /* Add margin to make space for profiles */
+        }
+
+        .ludo-board {
+            display: grid;
+            grid-template-columns: repeat(15, var(--cell-size));
+            grid-template-rows: repeat(15, var(--cell-size));
+            border: 3px solid var(--black);
+            position: relative;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .player-profile {
+            position: absolute;
+            width: 220px; /* Increased width for dice */
+            padding: 10px;
+            border-radius: 12px;
+            border: 3px solid transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background-color: #fff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            z-index: 20;
+            overflow: hidden; /* To contain the timer bar */
+        }
+        
+        #profile-red { top: 0; left: 0; transform: translate(-22%, -110%); }
+        #profile-green { top: 0; right: 0; transform: translate(22%, -110%); }
+        #profile-blue { bottom: 0; left: 0; transform: translate(-22%, 110%); }
+        #profile-yellow { bottom: 0; right: 0; transform: translate(22%, 110%); }
+
+
+        .player-profile.active-player {
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            transform: translateY(-5px) scale(1.05);
+        }
+        #profile-red.active-player { border-color: var(--red); transform: translate(-22%, -115%) scale(1.05); }
+        #profile-green.active-player { border-color: var(--green); transform: translate(22%, -115%) scale(1.05); }
+        #profile-blue.active-player { border-color: var(--blue); transform: translate(-22%, 115%) scale(1.05); }
+        #profile-yellow.active-player { border-color: var(--yellow); transform: translate(22%, 115%) scale(1.05); }
+        
+        .player-profile.eliminated {
+            opacity: 0.5;
+            background-color: #ccc;
+            pointer-events: none;
+        }
+
+
+        .player-avatar {
+            position: relative;
+        }
+        .player-avatar .avatar-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid var(--black);
+        }
+
+        .player-info { font-weight: bold; flex-grow: 1; }
+        .player-name { font-size: 1.1em; margin-bottom: 4px; }
+        .player-score { font-size: 1em; color: #555; }
+        .player-lives { font-size: 1.2em; }
+        .heart { color: var(--red); }
+        .heart.black { color: var(--black); }
+
+        .cell {
+            border: 1px solid var(--border-color);
+            box-sizing: border-box;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .home { position: relative; }
+        .home-red { grid-area: 1 / 1 / span 6 / span 6; background-color: var(--red); }
+        .home-green { grid-area: 1 / 10 / span 6 / span 6; background-color: var(--green); }
+        .home-blue { grid-area: 10 / 1 / span 6 / span 6; background-color: var(--blue); }
+        .home-yellow { grid-area: 10 / 10 / span 6 / span 6; background-color: var(--yellow); }
+
+        .home-base {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: calc(4 * var(--cell-size)); height: calc(4 * var(--cell-size));
+            background-color: var(--white); border: 2px solid var(--black);
+            display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr);
+            padding: 10px; gap: 10px; border-radius: 10px;
+        }
+
+        .token-placeholder { border-radius: 50%; display: flex; justify-content: center; align-items: center; }
+        .home-red .token-placeholder { border: 3px solid var(--red); }
+        .home-green .token-placeholder { border: 3px solid var(--green); }
+        .home-blue .token-placeholder { border: 3px solid var(--blue); }
+        .home-yellow .token-placeholder { border: 3px solid var(--yellow); }
+
+        .path { background-color: var(--white); }
+        .path-red { background-color: var(--red); }
+        .path-green { background-color: var(--green); }
+        .path-blue { background-color: var(--blue); }
+        .path-yellow { background-color: var(--yellow); }
+
+        .center { 
+            grid-area: 7 / 7 / span 3 / span 3; 
+            background-color: var(--board-bg);
+            position: relative; 
+        }
+        .center-triangle { 
+            width: 0; 
+            height: 0; 
+            position: absolute; 
+            --half-center-size: calc(1.5 * var(--cell-size));
+        }
+        .tri-green {
+            top: 0;
+            left: 0;
+            border-left: var(--half-center-size) solid transparent;
+            border-right: var(--half-center-size) solid transparent;
+            border-top: var(--half-center-size) solid var(--green);
+        }
+        .tri-yellow {
+            top: 0;
+            right: 0;
+            border-top: var(--half-center-size) solid transparent;
+            border-bottom: var(--half-center-size) solid transparent;
+            border-right: var(--half-center-size) solid var(--yellow);
+        }
+        .tri-blue {
+            bottom: 0;
+            left: 0;
+            border-left: var(--half-center-size) solid transparent;
+            border-right: var(--half-center-size) solid transparent;
+            border-bottom: var(--half-center-size) solid var(--blue);
+        }
+        .tri-red { 
+            top: 0; 
+            left: 0;
+            border-top: var(--half-center-size) solid transparent;
+            border-bottom: var(--half-center-size) solid transparent;
+            border-left: var(--half-center-size) solid var(--red);
+        }
+        
+        .bonus-text {
+            position: absolute;
+            font-size: calc(var(--cell-size) * 0.6);
+            font-weight: 900;
+            z-index: 5;
+            color: #fff5cc; /* A soft gold base color */
+            animation: pulsating-gold-glow 2s infinite ease-in-out;
+            transform-origin: center;
+        }
+
+        .bonus-green { top: 25%; left: 50%; transform: translate(-50%, -50%); }
+        .bonus-yellow { top: 50%; left: 75%; transform: translate(-50%, -50%); }
+        .bonus-blue { top: 75%; left: 50%; transform: translate(-50%, -50%); }
+        .bonus-red { top: 50%; left: 25%; transform: translate(-50%, -50%); }
+
+
+        .safe-spot::after { content: '★'; font-size: calc(var(--cell-size) * 0.6); color: #c9a30a; position: absolute; z-index: 1; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        
+        .token {
+            width: var(--token-size); 
+            height: var(--token-size);
+            border-radius: 50%; 
+            border: 2px solid var(--black);
+            box-shadow: inset 0 -3px 5px rgba(0,0,0,0.3);
+            cursor: pointer; 
+            position: absolute;
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: calc(var(--token-size) * 0.5);
+            font-weight: bold;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.7);
+            transition: all 0.2s ease-out;
+        }
+
+        .token.movable { 
+            animation: pulse 1s infinite; 
+            box-shadow: inset 0 -3px 5px rgba(0,0,0,0.3), 0 0 15px 5px #fff, 0 0 25px 10px #ff0; 
+        }
+        
+        .token.home-movable {
+            animation: home-pulse 0.8s infinite ease-in-out;
+            box-shadow: inset 0 -3px 5px rgba(0,0,0,0.3), 0 0 20px 10px #00ff00, 0 0 30px 15px #ffff00;
+        }
+
+        .token-red { background-color: var(--red); }
+        .token-green { background-color: var(--green); }
+        .token-blue { background-color: var(--blue); }
+        .token-yellow { background-color: var(--yellow); }
+
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        
+        @keyframes home-pulse {
+            0% { transform: scale(1.0); }
+            50% { transform: scale(1.25); }
+            100% { transform: scale(1.0); }
+        }
+
+        .controls {
+            text-align: center; padding: 20px;
+            background: var(--white); border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+            width: 300px;
+        }
+        
+        .dice-container {
+            display: none; /* Hide dice by default */
+        }
+        .active-player .dice-container {
+            display: block; /* Show for active player */
+        }
+        .dice {
+            width: 50px; height: 50px;
+            border: 2px solid var(--black); border-radius: 10px;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 28px; font-weight: bold;
+            background-color: #fff;
+            cursor: pointer; transition: transform 0.2s;
+        }
+        .dice:hover { transform: scale(1.05); }
+        .dice.rolling { animation: roll 0.5s linear; }
+        @keyframes roll { 0% { transform: rotate(0deg) scale(1); } 100% { transform: rotate(360deg) scale(1.2); } }
+
+        @keyframes token-jump {
+            0%, 100% {
+                transform: translateY(0) scale(1);
+            }
+            50% {
+                transform: translateY(calc(var(--cell-size) * -0.75)) scale(1.1);
+            }
+        }
+
+        #game-message {
+            font-size: 1.2em; font-weight: bold;
+            min-height: 2em; padding: 10px;
+            border-radius: 8px; color: var(--white);
+            transition: background-color 0.5s;
+        }
+        
+        @keyframes pulsating-gold-glow {
+            0% {
+                transform: scale(1) translate(-50%, -50%);
+                text-shadow: 0 0 5px #ffd700, 0 0 10px #ffa726, 0 0 15px #ff6f00, 0 0 20px #e65100;
+            }
+            50% {
+                transform: scale(1.15) translate(-50%, -50%);
+                text-shadow: 0 0 10px #fff, 0 0 20px #ffd700, 0 0 30px #ffa726, 0 0 40px #ff6f00;
+            }
+            100% {
+                transform: scale(1) translate(-50%, -50%);
+                text-shadow: 0 0 5px #ffd700, 0 0 10px #ffa726, 0 0 15px #ff6f00, 0 0 20px #e65100;
+            }
+        }
+
+        .timer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background-color: #e0e0e0;
+        }
+        .timer-bar {
+            width: 100%;
+            height: 100%;
+            background-color: var(--green);
+            transition: width 0.1s linear, background-color 0.5s linear;
+        }
+
+        #setup-screen {
+            background: #fff;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        #setup-screen h2 { margin-top: 0; }
+        .player-select-btn {
+            padding: 10px 20px;
+            font-size: 1em;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 8px;
+            border: 2px solid #ccc;
+            background-color: #f0f0f0;
+        }
+        .player-select-btn:hover { background-color: #e0e0e0; }
+        
+        #game-container { display: none; }
+
+        #game-timer {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .crown-icon {
+            position: absolute;
+            top: -15px;
+            left: 5px;
+            font-size: 30px;
+            opacity: 0;
+            transform: translateY(10px) scale(0);
+            transition: opacity 0.5s, transform 0.5s;
+            z-index: 100;
+            filter: drop-shadow(0 0 5px gold);
+        }
+
+        .player-profile.winner .crown-icon {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            animation: float-glow 2s infinite ease-in-out;
+        }
+
+        @keyframes float-glow {
+            0%, 100% {
+                transform: translateY(0) scale(1);
+                text-shadow: 0 0 5px gold, 0 0 10px gold;
+            }
+            50% {
+                transform: translateY(-5px) scale(1.1);
+                text-shadow: 0 0 10px gold, 0 0 20px #ffc107;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .board-wrapper {
+                margin: 0;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 15px;
+            }
+            .player-profile {
+                position: static;
+                transform: none !important;
+                width: 220px;
+            }
+            .profiles-top-row, .profiles-bottom-row {
+                display: flex;
+                gap: 15px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            #board-container { order: 2; }
+            .profiles-top-row { order: 1; }
+            .profiles-bottom-row { order: 3; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="setup-screen">
+    <h2>Khiladi Chunein</h2>
+    <div id="2-player-options" style="margin-bottom: 10px;">
+        <strong>2 Khiladi:</strong>
+        <button class="player-select-btn" data-colors="red,yellow">Red vs Yellow</button>
+        <button class="player-select-btn" data-colors="green,blue">Green vs Blue</button>
+    </div>
+    <hr style="margin: 15px 0;">
+    <div>
+        <button class="player-select-btn" data-colors="red,green,blue">3 Khiladi</button>
+        <button class="player-select-btn" data-colors="red,green,blue,yellow">4 Khiladi</button>
+    </div>
+</div>
+
+<div id="game-container">
+    <div class="game-area">
+        <div class="board-wrapper" id="board-wrapper">
+            <div id="board-container">
+                <div class="ludo-board" id="ludo-board">
+                    <!-- JS will populate this -->
+                </div>
+            </div>
+            <!-- Profiles will be injected here by JS -->
+        </div>
+        <div class="controls">
+            <div id="game-timer">00:00</div>
+            <div id="game-message">Ludo Game me Swagat Hai!</div>
+            <button id="reset-button" style="margin-top: 10px; padding: 8px 16px; border-radius: 5px; border: 1px solid #ccc; cursor: pointer;">Naya Game</button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- DOM Elements ---
+    const setupScreen = document.getElementById('setup-screen');
+    const gameContainer = document.getElementById('game-container');
+    const boardWrapper = document.getElementById('board-wrapper');
+    const boardElement = document.getElementById('ludo-board');
+    const messageElement = document.getElementById('game-message');
+    const resetButton = document.getElementById('reset-button');
+    const gameTimerElement = document.getElementById('game-timer');
+
+    // --- Game Constants ---
+    let PLAYERS = [];
+    const ALL_PLAYERS = ['red', 'green', 'yellow', 'blue'];
+    const TOKENS_PER_PLAYER = 4;
+    const PATH_LENGTH = 52;
+    const STEPS_ON_MAIN_PATH = 51; 
+    const HOME_LANE_SQUARES = 5; 
+    const HOME_PATH_STEPS_TO_FINISH = 6;
+    const FINISH_BONUS = 50; 
+
+    // --- Path Definitions ---
+    const PATH_COORDS = [
+        [7, 2], [7, 3], [7, 4], [7, 5], [7, 6], [6, 7], [5, 7], [4, 7], [3, 7], [2, 7], [1, 7], [1, 8], [1, 9], [2, 9], [3, 9], [4, 9], [5, 9], [6, 9], [7, 10], [7, 11], [7, 12], [7, 13], [7, 14], [7, 15], [8, 15], [9, 15], [9, 14], [9, 13], [9, 12], [9, 11], [9, 10], [10, 9], [11, 9], [12, 9], [13, 9], [14, 9], [15, 9], [15, 8], [15, 7], [14, 7], [13, 7], [12, 7], [11, 7], [10, 7], [9, 6], [9, 5], [9, 4], [9, 3], [9, 2], [9, 1], [8, 1], [7, 1]
+    ];
+    const START_POSITIONS = { red: 0, green: 13, yellow: 26, blue: 39 };
+    const HOME_PATH_COORDS = {
+        red: [[8, 2], [8, 3], [8, 4], [8, 5], [8, 6]],
+        green: [[2, 8], [3, 8], [4, 8], [5, 8], [6, 8]],
+        yellow: [[8, 14], [8, 13], [8, 12], [8, 11], [8, 10]],
+        blue: [[14, 8], [13, 8], [12, 8], [11, 8], [10, 8]]
+    };
+    const HOME_BASE_PLACEHOLDERS = {
+        red: ['home-base-red-0', 'home-base-red-1', 'home-base-red-2', 'home-base-red-3'],
+        green: ['home-base-green-0', 'home-base-green-1', 'home-base-green-2', 'home-base-green-3'],
+        yellow: ['home-base-yellow-0', 'home-base-yellow-1', 'home-base-yellow-2', 'home-base-yellow-3'],
+        blue: ['home-base-blue-0', 'home-base-blue-1', 'home-base-blue-2', 'home-base-blue-3']
+    };
+    const SAFE_SPOTS = [0, 8, 13, 21, 26, 34, 39, 47];
+
+    let gameState = {};
+    let turnTimer = null;
+    let gameTimerInterval = null;
+    let totalGameTime = 0;
+
+    function initializeGameState() {
+        gameState = { 
+            players: {},
+            currentPlayerIndex: 0, 
+            diceValue: 0, 
+            diceRolled: false, 
+            gameActive: true, 
+            winner: null, 
+            isMoving: false 
+        };
+        PLAYERS.forEach(player => {
+            gameState.players[player] = {
+                tokens: [],
+                lives: 3,
+                eliminated: false,
+                turnsSinceSix: 0
+            };
+            for (let i = 0; i < TOKENS_PER_PLAYER; i++) {
+                gameState.players[player].tokens.push({ id: `${player}-${i}`, position: -1, state: 'home', element: null, score: 0 });
+            }
+        });
+    }
+
+    function createBoard() {
+        boardElement.innerHTML = '';
+        for (let r = 1; r <= 15; r++) {
+            for (let c = 1; c <= 15; c++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.style.gridRow = r; cell.style.gridColumn = c;
+                cell.id = `cell-${r}-${c}`;
+                boardElement.appendChild(cell);
+            }
+        }
+        ALL_PLAYERS.forEach(color => {
+            const home = document.createElement('div');
+            home.classList.add('home', `home-${color}`);
+            const homeBase = document.createElement('div');
+            homeBase.classList.add('home-base');
+            for(let i=0; i < 4; i++){
+                const placeholder = document.createElement('div');
+                placeholder.classList.add('token-placeholder');
+                placeholder.id = `home-base-${color}-${i}`;
+                homeBase.appendChild(placeholder);
+            }
+            home.appendChild(homeBase);
+            boardElement.appendChild(home);
+        });
+        PATH_COORDS.forEach((coord, index) => {
+            const cell = document.getElementById(`cell-${coord[0]}-${coord[1]}`);
+            cell.classList.add('path');
+            if (SAFE_SPOTS.includes(index)) {
+                cell.classList.add('safe-spot');
+                Object.keys(START_POSITIONS).forEach(player => {
+                    if (START_POSITIONS[player] === index) {
+                        cell.style.backgroundColor = `var(--${player})`;
+                    }
+                });
+            }
+        });
+        Object.keys(HOME_PATH_COORDS).forEach(color => {
+            HOME_PATH_COORDS[color].forEach(coord => {
+                const cell = document.getElementById(`cell-${coord[0]}-${coord[1]}`);
+                cell.classList.add(`path-${color}`);
+            });
+        });
+        const center = document.createElement('div');
+        center.classList.add('center');
+        
+        ['green', 'yellow', 'blue', 'red'].forEach(color => {
+            const triangle = document.createElement('div');
+            triangle.classList.add('center-triangle', `tri-${color}`);
+            center.appendChild(triangle);
+        });
+
+        ['green', 'yellow', 'blue', 'red'].forEach(color => {
+            const bonusText = document.createElement('div');
+            bonusText.classList.add('bonus-text', `bonus-${color}`);
+            bonusText.textContent = FINISH_BONUS;
+            center.appendChild(bonusText);
+        });
+
+        boardElement.appendChild(center);
+    }
+
+    function createTokens() {
+        boardElement.querySelectorAll('.token').forEach(t => t.remove());
+        PLAYERS.forEach(player => {
+            gameState.players[player].tokens.forEach((token) => {
+                const tokenElement = document.createElement('div');
+                tokenElement.id = token.id;
+                tokenElement.classList.add('token', `token-${player}`);
+                token.element = tokenElement;
+                tokenElement.addEventListener('click', () => onTokenClick(player, token.id.split('-')[1]));
+                boardElement.appendChild(tokenElement);
+            });
+        });
+    }
+
+    function createPlayerProfiles() {
+        boardWrapper.querySelectorAll('.player-profile').forEach(p => p.remove());
+        const topRow = document.createElement('div');
+        topRow.className = 'profiles-top-row';
+        const bottomRow = document.createElement('div');
+        bottomRow.className = 'profiles-bottom-row';
+
+        PLAYERS.forEach((player) => {
+            const profileDiv = document.createElement('div');
+            profileDiv.id = `profile-${player}`;
+            profileDiv.classList.add('player-profile');
+
+            profileDiv.innerHTML = `
+                <div class="player-avatar">
+                    <span class="crown-icon">👑</span>
+                    <div class="avatar-icon" style="background-color: var(--${player});"></div>
+                </div>
+                <div class="player-info">
+                    <div class="player-name">${player.charAt(0).toUpperCase() + player.slice(1)}</div>
+                     <div class="player-lives">
+                        <span class="heart" id="heart-${player}-1">♥</span>
+                        <span class="heart" id="heart-${player}-2">♥</span>
+                        <span class="heart" id="heart-${player}-3">♥</span>
+                    </div>
+                    <div class="player-score">Score: <span id="score-${player}">0</span></div>
+                </div>
+                <div class="dice-container">
+                    <div class="dice" id="dice-${player}">🎲</div>
+                </div>
+                <div class="timer">
+                    <div class="timer-bar"></div>
+                </div>
+            `;
+            
+            if (player === 'red' || player === 'green') {
+                topRow.appendChild(profileDiv);
+            } else {
+                bottomRow.appendChild(profileDiv);
+            }
+        });
+        
+        boardWrapper.prepend(topRow);
+        boardWrapper.append(bottomRow);
+    }
+
+    function updatePlayerProfiles() {
+        document.querySelectorAll('.player-profile').forEach(p => p.classList.remove('active-player'));
+        
+        const currentPlayer = PLAYERS[gameState.currentPlayerIndex];
+
+        if (gameState.gameActive && !gameState.players[currentPlayer].eliminated) {
+            document.getElementById(`profile-${currentPlayer}`).classList.add('active-player');
+        }
+
+        PLAYERS.forEach(player => {
+            let totalScore = 0;
+            if(gameState.players[player]) {
+                gameState.players[player].tokens.forEach(token => {
+                    totalScore += token.score;
+                    if (token.state === 'active') {
+                        totalScore += token.position;
+                    } else if (token.state === 'homing') {
+                        totalScore += STEPS_ON_MAIN_PATH + token.position + 1;
+                    } else if (token.state === 'finished') {
+                        totalScore += STEPS_ON_MAIN_PATH + HOME_PATH_STEPS_TO_FINISH;
+                    }
+                });
+            }
+            const scoreSpan = document.getElementById(`score-${player}`);
+            if(scoreSpan) scoreSpan.textContent = totalScore;
+        });
+        updateTokenPositions();
+    }
+
+    function updateTokenScoresOnBoard() {
+        PLAYERS.forEach(player => {
+            if(gameState.players[player]) {
+                gameState.players[player].tokens.forEach(token => {
+                    const tokenEl = token.element;
+                    let displayValue = token.score;
+                    if (token.state === 'active') {
+                        displayValue += token.position;
+                        tokenEl.textContent = displayValue > 0 ? displayValue : '';
+                    } else if (token.state === 'homing') {
+                        displayValue += STEPS_ON_MAIN_PATH + token.position + 1;
+                        tokenEl.textContent = displayValue;
+                    } else {
+                        tokenEl.textContent = '';
+                    }
+                });
+            }
+        });
+    }
+
+    function updateTokenPositions() {
+        const cellGroups = new Map();
+        
+        document.querySelectorAll('.token').forEach(t => {
+            t.style.transform = 'translate(0, 0)';
+        });
+
+        PLAYERS.forEach(player => {
+            if(gameState.players[player] && !gameState.players[player].eliminated) {
+                gameState.players[player].tokens.forEach(token => {
+                    if (token.state === 'active' || token.state === 'homing') {
+                        let cellId;
+                        if (token.state === 'active') {
+                            const pathIndex = (START_POSITIONS[player] + token.position) % PATH_LENGTH;
+                            const coords = PATH_COORDS[pathIndex];
+                            cellId = `cell-${coords[0]}-${coords[1]}`;
+                        } else { 
+                            const coords = HOME_PATH_COORDS[player][token.position];
+                            cellId = `cell-${coords[0]}-${coords[1]}`;
+                        }
+                        if (!cellGroups.has(cellId)) {
+                            cellGroups.set(cellId, []);
+                        }
+                        cellGroups.get(cellId).push(token);
+                    }
+                });
+            }
+        });
+        
+        PLAYERS.forEach(player => {
+            const finishedTokensForPlayer = [];
+            if(gameState.players[player]) {
+                gameState.players[player].tokens.forEach((token, i) => {
+                    if (token.state === 'home') {
+                        const targetCell = document.getElementById(HOME_BASE_PLACEHOLDERS[player][i]);
+                        const targetRect = targetCell.getBoundingClientRect();
+                        const boardRect = boardElement.getBoundingClientRect();
+                        token.element.style.top = `${targetRect.top - boardRect.top + (targetRect.height - token.element.offsetHeight) / 2}px`;
+                        token.element.style.left = `${targetRect.left - boardRect.left + (targetRect.width - token.element.offsetWidth) / 2}px`;
+                    } else if (token.state === 'finished') {
+                        finishedTokensForPlayer.push(token.element);
+                    }
+                });
+            }
+             const centerDiv = document.querySelector('.center');
+            if (centerDiv && finishedTokensForPlayer.length > 0) {
+                const boardRect = boardElement.getBoundingClientRect();
+                const centerRect = centerDiv.getBoundingClientRect();
+                finishedTokensForPlayer.forEach((tokenEl, index) => {
+                    const tokenSize = tokenEl.offsetWidth;
+                    const spacing = 1.1;
+                    const gridOffsetX = (index % 2) * tokenSize * spacing;
+                    const gridOffsetY = Math.floor(index / 2) * tokenSize * spacing;
+                    const gridTotalWidth = tokenSize * spacing;
+                    const gridTotalHeight = tokenSize * spacing;
+                    const centerX = centerRect.width / 2;
+                    const centerY = centerRect.height / 2;
+                    let quadrantCenterX = 0, quadrantCenterY = 0;
+                    if (player === 'green') { quadrantCenterX = centerX; quadrantCenterY = centerY / 2; } 
+                    else if (player === 'red') { quadrantCenterX = centerX / 2; quadrantCenterY = centerY; } 
+                    else if (player === 'yellow') { quadrantCenterX = centerX * 1.5; quadrantCenterY = centerY; } 
+                    else if (player === 'blue') { quadrantCenterX = centerX; quadrantCenterY = centerY * 1.5; }
+                    const top = quadrantCenterY - (gridTotalHeight / 2) + gridOffsetY;
+                    const left = quadrantCenterX - (gridTotalWidth / 2) + gridOffsetX;
+                    tokenEl.style.top = `${centerRect.top - boardRect.top + top}px`;
+                    tokenEl.style.left = `${centerRect.left - boardRect.left + left}px`;
+                });
+            }
+        });
+
+        for (const [cellId, tokensOnCell] of cellGroups.entries()) {
+            const targetCell = document.getElementById(cellId);
+            if (!targetCell) continue;
+
+            const targetRect = targetCell.getBoundingClientRect();
+            const boardRect = boardElement.getBoundingClientRect();
+            
+            const currentPlayer = PLAYERS[gameState.currentPlayerIndex];
+            const currentPlayerTokens = tokensOnCell.filter(t => t.id.startsWith(currentPlayer));
+            const otherPlayersTokens = tokensOnCell.filter(t => !t.id.startsWith(currentPlayer));
+            
+            const sortedTokens = [...otherPlayersTokens, ...currentPlayerTokens];
+
+            sortedTokens.forEach((token, i) => {
+                const el = token.element;
+                const baseTop = targetRect.top - boardRect.top + (targetRect.height - el.offsetHeight) / 2;
+                const baseLeft = targetRect.left - boardRect.left + (targetRect.width - el.offsetWidth) / 2;
+                el.style.top = `${baseTop}px`;
+                el.style.left = `${baseLeft}px`;
+                const offset = i * 4;
+                el.style.transform = `translate(${offset}px, ${offset}px)`;
+                el.style.zIndex = 10 + i;
+            });
+        }
+    }
+
+    function rollDice() {
+        if (!gameState.gameActive || gameState.diceRolled || gameState.isMoving) return;
+        
+        if (turnTimer) clearInterval(turnTimer);
+
+        const currentPlayer = PLAYERS[gameState.currentPlayerIndex];
+        const diceElement = document.getElementById(`dice-${currentPlayer}`);
+        if (!diceElement) return;
+
+        diceElement.classList.add('rolling');
+        setTimeout(() => {
+            const playerData = gameState.players[currentPlayer];
+            const chanceOfSix = Math.min(0.25 + (playerData.turnsSinceSix * 0.08), 0.75);
+            const random = Math.random();
+
+            if (random < chanceOfSix) {
+                gameState.diceValue = 6;
+            } else {
+                gameState.diceValue = Math.floor(Math.random() * 5) + 1;
+            }
+
+            diceElement.textContent = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][gameState.diceValue - 1];
+            diceElement.classList.remove('rolling');
+            gameState.diceRolled = true;
+            updateMessage(`${currentPlayer.toUpperCase()} ka dice roll hai ${gameState.diceValue}!`);
+            handlePostRoll();
+        }, 500);
+    }
+    
+    async function handlePostRoll() {
+        const currentPlayer = PLAYERS[gameState.currentPlayerIndex];
+        const movableTokens = getMovableTokens(currentPlayer);
+
+        if (movableTokens.length === 0) {
+            updateMessage(`Maaf kijiye, koi chaal nahi chal sakte.`);
+            setTimeout(nextTurn, 1500);
+            return;
+        }
+        
+        if (movableTokens.length === 1 && gameState.diceValue !== 6) {
+             setTimeout(async () => {
+                await moveToken(currentPlayer, movableTokens[0].id.split('-')[1]);
+            }, 500);
+        } 
+        else {
+            updateMessage(`Chalane ke liye ek goti chunein.`);
+            startTurnTimer('move');
+            movableTokens.forEach(token => {
+                if (token.state === 'home') {
+                    token.element.classList.add('home-movable');
+                } else {
+                    token.element.classList.add('movable');
+                }
+            });
+        }
+    }
+
+    function getMovableTokens(player) {
+        const playerTokens = gameState.players[player].tokens;
+        const dice = gameState.diceValue;
+        return playerTokens.filter(token => {
+            if (token.state === 'finished') return false;
+            if (token.state === 'home') return dice === 6;
+            if (token.state === 'active') {
+                return true;
+            }
+            if (token.state === 'homing') {
+                return (token.position + 1) + dice <= HOME_PATH_STEPS_TO_FINISH;
+            }
+            return true; 
+        });
+    }
+
+    async function onTokenClick(player, tokenIndex) {
+        if (!gameState.gameActive || player !== PLAYERS[gameState.currentPlayerIndex] || !gameState.diceRolled || gameState.isMoving) return;
+        const token = gameState.players[player].tokens[tokenIndex];
+        if (token.element.classList.contains('movable') || token.element.classList.contains('home-movable')) {
+            await moveToken(player, tokenIndex);
+        }
+    }
+
+    async function animateTokenMove(token, player, steps) {
+        const el = token.element;
+        el.style.zIndex = '100'; 
+        let tempPos = token.position;
+        let tempState = token.state;
+        const animationDuration = 250; 
+
+        for (let i = 0; i < steps; i++) {
+            if (tempState === 'home' && i === 0) {
+                tempState = 'active';
+                tempPos = 0;
+            } else if (tempState === 'active') {
+                const entryThreshold = STEPS_ON_MAIN_PATH - token.position;
+                if (i >= entryThreshold -1) {
+                    tempState = 'homing';
+                    tempPos = (token.position + i + 1) - STEPS_ON_MAIN_PATH;
+                } else {
+                    tempPos++;
+                }
+            } else if (tempState === 'homing') {
+                tempPos++;
+            }
+
+            let targetCell;
+            if (tempState === 'active') {
+                const pathIndex = (START_POSITIONS[player] + tempPos) % PATH_LENGTH;
+                const coords = PATH_COORDS[pathIndex];
+                targetCell = document.getElementById(`cell-${coords[0]}-${coords[1]}`);
+            } else if (tempState === 'homing') {
+                if (tempPos < HOME_LANE_SQUARES) {
+                    const coords = HOME_PATH_COORDS[player][tempPos];
+                    targetCell = document.getElementById(`cell-${coords[0]}-${coords[1]}`);
+                } else {
+                    break; 
+                }
+            }
+            
+            el.style.animation = `token-jump ${animationDuration}ms ease-out`;
+            
+            await new Promise(resolve => setTimeout(resolve, animationDuration / 2));
+
+            if (targetCell) {
+                const targetRect = targetCell.getBoundingClientRect();
+                const boardRect = boardElement.getBoundingClientRect();
+                el.style.top = `${targetRect.top - boardRect.top + (targetRect.height - el.offsetHeight) / 2}px`;
+                el.style.left = `${targetRect.left - boardRect.left + (targetRect.width - el.offsetWidth) / 2}px`;
+                el.style.transform = 'translate(0, 0)'; 
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, animationDuration / 2));
+
+            el.style.animation = '';
+        }
+    }
+
+    async function moveToken(player, tokenIndex) {
+        if (turnTimer) clearInterval(turnTimer); 
+        document.querySelectorAll('.movable, .home-movable').forEach(el => {
+            el.classList.remove('movable');
+            el.classList.remove('home-movable');
+        });
+        const token = gameState.players[player].tokens[tokenIndex];
+        const dice = gameState.diceValue;
+        let extraTurn = false;
+        gameState.isMoving = true;
+
+        if (token.state === 'home' && dice === 6) {
+            await animateTokenMove(token, player, 1);
+            token.state = 'active';
+            token.position = 0;
+            extraTurn = true;
+        } else {
+            await animateTokenMove(token, player, dice);
+            if (token.state === 'active') {
+                const newPosition = token.position + dice;
+                if (newPosition >= STEPS_ON_MAIN_PATH) {
+                    token.state = 'homing';
+                    token.position = newPosition - STEPS_ON_MAIN_PATH;
+                } else {
+                    token.position = newPosition;
+                }
+            } else if (token.state === 'homing') {
+                token.position += dice;
+            }
+        }
+
+        if (token.state === 'homing' && (token.position + 1) >= HOME_PATH_STEPS_TO_FINISH) {
+            token.state = 'finished';
+            token.position = -1;
+            token.score += FINISH_BONUS; 
+            updateMessage(`Ek ${player.toUpperCase()} token ghar pahuncha aur ${FINISH_BONUS} bonus points mile!`);
+            extraTurn = true;
+        }
+        
+        if (dice === 6) {
+            gameState.players[player].turnsSinceSix = 0;
+        }
+
+        const captured = token.state === 'active' ? checkForCapture(player, token) : false;
+        if (captured) extraTurn = true;
+        
+        updatePlayerProfiles(); 
+        updateTokenScoresOnBoard();
+        
+        checkForWin(player);
+        gameState.isMoving = false;
+
+        if (gameState.winner) return;
+
+        if (dice === 6 || extraTurn) {
+            updateMessage(`${player.toUpperCase()} ko ek aur chaal mili! Phir se dice roll karein.`);
+            gameState.diceRolled = false;
+            startTurnTimer('roll'); 
+        } else {
+            setTimeout(nextTurn, 500);
+        }
+    }
+
+    function checkForCapture(currentPlayer, movedToken) {
+        const movedTokenGlobalPos = (START_POSITIONS[currentPlayer] + movedToken.position) % PATH_LENGTH;
+        
+        if (SAFE_SPOTS.includes(movedTokenGlobalPos)) {
+            return false;
+        }
+
+        let captureMade = false;
+        const tokensOnTargetSquare = [];
+        PLAYERS.forEach(p => {
+            if (p === currentPlayer) return;
+            gameState.players[p].tokens.forEach(t => {
+                if (t.state === 'active') {
+                    const otherTokenGlobalPos = (START_POSITIONS[p] + t.position) % PATH_LENGTH;
+                    if (otherTokenGlobalPos === movedTokenGlobalPos) {
+                        tokensOnTargetSquare.push(t);
+                    }
+                }
+            });
+        });
+        
+        if (tokensOnTargetSquare.length === 1) {
+            const tokenToCapture = tokensOnTargetSquare[0];
+            const otherPlayer = tokenToCapture.id.split('-')[0];
+            const capturedValue = tokenToCapture.position + tokenToCapture.score;
+            movedToken.score += capturedValue;
+            
+            updateMessage(`${currentPlayer.toUpperCase()} ne ${otherPlayer.toUpperCase()} ka token capture kiya aur ${capturedValue} points prapt kiye!`);
+
+            tokenToCapture.state = 'home';
+            tokenToCapture.position = -1;
+            tokenToCapture.score = 0;
+            
+            captureMade = true;
+        }
+
+        return captureMade;
+    }
+
+    function checkForWin(player) {
+        const finishedTokens = gameState.players[player].tokens.filter(t => t.state === 'finished').length;
+        if (finishedTokens === TOKENS_PER_PLAYER) {
+            declareWinner(player, `${player.toUpperCase()} game jeet gaye! Badhai ho!`);
+        }
+    }
+
+    function nextTurn() {
+        if (!gameState.gameActive || gameState.isMoving) return;
+        if (turnTimer) clearInterval(turnTimer);
+
+        const oldPlayer = PLAYERS[gameState.currentPlayerIndex];
+        if (gameState.diceValue !== 6) {
+            gameState.players[oldPlayer].turnsSinceSix++;
+        }
+
+        const oldDice = document.getElementById(`dice-${oldPlayer}`);
+        if(oldDice) oldDice.textContent = '🎲';
+
+        let nextPlayerIndex = gameState.currentPlayerIndex;
+        let attempts = 0;
+        do {
+            nextPlayerIndex = (nextPlayerIndex + 1) % PLAYERS.length;
+            attempts++;
+        } while (gameState.players[PLAYERS[nextPlayerIndex]].eliminated && attempts < PLAYERS.length);
+        
+        gameState.currentPlayerIndex = nextPlayerIndex;
+        gameState.diceRolled = false;
+        gameState.diceValue = 0;
+        
+        const currentPlayer = PLAYERS[gameState.currentPlayerIndex];
+        updatePlayerProfiles(); 
+        updateMessage(`${currentPlayer.toUpperCase()} ki baari. Dice roll karein!`);
+        startTurnTimer('roll');
+    }
+
+    function updateMessage(msg, isWinner = false) {
+        messageElement.textContent = msg;
+        const color = isWinner ? 'gold' : `var(--${PLAYERS[gameState.currentPlayerIndex]})`;
+        messageElement.style.backgroundColor = color;
+        if (isWinner) {
+            messageElement.style.color = 'var(--black)';
+            messageElement.style.animation = 'pulse 2s infinite';
+        } else {
+            messageElement.style.color = 'var(--white)';
+            messageElement.style.animation = 'none';
+        }
+    }
+    
+    function startTurnTimer(stage) {
+        if (turnTimer) clearInterval(turnTimer);
+
+        const duration = stage === 'move' ? 7000 : 15000;
+
+        const currentPlayer = PLAYERS[gameState.currentPlayerIndex];
+        const profileElement = document.getElementById(`profile-${currentPlayer}`);
+        if (!profileElement) return;
+        const timerBar = profileElement.querySelector('.timer-bar');
+        
+        timerBar.style.transition = 'none';
+        timerBar.style.width = '100%';
+        timerBar.style.backgroundColor = 'var(--green)';
+        
+        void timerBar.offsetWidth; 
+        
+        timerBar.style.transition = `width ${duration / 1000}s linear, background-color 0.5s linear`;
+        timerBar.style.width = '0%';
+
+        turnTimer = setTimeout(handleTimeout, duration);
+    }
+
+    function handleTimeout() {
+        const currentPlayer = PLAYERS[gameState.currentPlayerIndex];
+        const playerData = gameState.players[currentPlayer];
+        playerData.lives--;
+        updatePlayerLives(currentPlayer);
+
+        if (playerData.lives <= 0) {
+            eliminatePlayer(currentPlayer);
+        } else {
+            updateMessage(`${currentPlayer.toUpperCase()} ka samay samapt! Agli chaal.`);
+            setTimeout(nextTurn, 500);
+        }
+    }
+
+    function updatePlayerLives(player) {
+        const lives = gameState.players[player].lives;
+        for (let i = 1; i <= 3; i++) {
+            const heart = document.getElementById(`heart-${player}-${i}`);
+            if (heart) {
+                if (i > lives) {
+                    heart.classList.add('black');
+                } else {
+                    heart.classList.remove('black');
+                }
+            }
+        }
+    }
+
+    function eliminatePlayer(player) {
+        gameState.players[player].eliminated = true;
+        const profile = document.getElementById(`profile-${player}`);
+        profile.classList.add('eliminated');
+        profile.querySelector('.player-name').textContent = `${player.toUpperCase()} (Off)`;
+        
+        gameState.players[player].tokens.forEach(token => {
+            if(token.element) token.element.style.display = 'none';
+        });
+
+        const activePlayers = PLAYERS.filter(p => !gameState.players[p].eliminated);
+        if (activePlayers.length <= 1) {
+            declareWinner(activePlayers[0], `${activePlayers[0].toUpperCase()} game jeet gaye!`);
+        } else {
+            updateMessage(`${player.toUpperCase()} game se bahar!`);
+            setTimeout(nextTurn, 1500);
+        }
+    }
+    
+    function declareWinner(winner, message) {
+        if (!gameState.gameActive) return;
+
+        gameState.gameActive = false;
+        gameState.winner = winner;
+
+        if (turnTimer) clearInterval(turnTimer);
+        if (gameTimerInterval) clearInterval(gameTimerInterval);
+
+        updateMessage(message, true);
+
+        if (winner) {
+            const profile = document.getElementById(`profile-${winner}`);
+            if(profile) profile.classList.add('winner');
+        }
+    }
+    
+    function startGameTimer(duration) {
+        if (gameTimerInterval) clearInterval(gameTimerInterval);
+        let timer = duration;
+        gameTimerInterval = setInterval(() => {
+            const minutes = Math.floor(timer / 60);
+            let seconds = timer % 60;
+            seconds = seconds < 10 ? '0' + seconds : seconds;
+            gameTimerElement.textContent = `${minutes}:${seconds}`;
+            if (--timer < 0) {
+                endGameByTime();
+            }
+        }, 1000);
+    }
+    
+    function endGameByTime() {
+        let maxScore = -1;
+        let winners = [];
+        
+        PLAYERS.forEach(player => {
+            if (gameState.players[player].eliminated) return;
+            const scoreSpan = document.getElementById(`score-${player}`);
+            const score = parseInt(scoreSpan.textContent);
+            if(score > maxScore) {
+                maxScore = score;
+                winners = [player];
+            } else if (score === maxScore) {
+                winners.push(player);
+            }
+        });
+        
+        let winnerMessage;
+        let winner = null;
+        if (winners.length > 1) {
+            winnerMessage = `Samay samapt! ${winners.join(' aur ')} ${maxScore} points ke saath barabari par hain!`;
+        } else if (winners.length === 1) {
+            winner = winners[0];
+            winnerMessage = `Samay samapt! ${winner.toUpperCase()} ${maxScore} points ke saath jeet gaye!`;
+        } else {
+            winnerMessage = `Samay samapt! Koi nahi jeeta.`;
+        }
+        declareWinner(winner, winnerMessage);
+    }
+
+    function initGame(selectedPlayers, gameTime) {
+        PLAYERS = selectedPlayers;
+        totalGameTime = gameTime;
+
+        setupScreen.style.display = 'none';
+        gameContainer.style.display = 'block';
+
+        initializeGameState();
+        createBoard();
+        createPlayerProfiles();
+        createTokens();
+        updatePlayerProfiles(); 
+        updateTokenScoresOnBoard();
+        updateMessage(`${PLAYERS[0].toUpperCase()} ki baari. Dice roll karein!`);
+        startTurnTimer('roll');
+        startGameTimer(totalGameTime);
+        setTimeout(() => updateTokenPositions(), 100);
+    }
+    
+    document.querySelectorAll('.player-select-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            const colors = button.dataset.colors.split(',');
+            const numPlayers = colors.length;
+            let gameTime;
+            
+            if (numPlayers === 4) gameTime = 480; // 8 minutes
+            else if (numPlayers === 3) gameTime = 420; // 7 minutes
+            else if (numPlayers === 2) gameTime = 360; // 6 minutes
+            
+            initGame(colors, gameTime);
+        });
+    });
+
+    resetButton.addEventListener('click', () => {
+        if(turnTimer) clearInterval(turnTimer);
+        if(gameTimerInterval) clearInterval(gameTimerInterval);
+        gameContainer.style.display = 'none';
+        setupScreen.style.display = 'block';
+    });
+    
+    boardWrapper.addEventListener('click', (e) => {
+        if (e.target.classList.contains('dice')) {
+            rollDice();
+        }
+    });
+
+});
+</script>
+
+</body>
+</html>
